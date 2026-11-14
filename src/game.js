@@ -165,6 +165,7 @@ bindLeaderboard(seed => {
 });
 bindControls({
   onPause: togglePause,
+  onUpright: pause,
   onMute: () => { const m = toggleMute(); if (G.active) toast(m ? 'Sound off' : 'Sound on', 900, true); },
   onBlur: () => { releaseInput(); pause(); },
   onLockLost: pause,

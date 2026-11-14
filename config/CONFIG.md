@@ -135,6 +135,8 @@ The sun rises over the course of a round: dawn at the start (low, warm, dim ligh
 | `carryBase`, `carryPerStage` | 100, 20 | Mana you can carry: base + per stage × stage. |
 | `groundClearance` | 1.4 | Lowest the carpet's centre can fly above the ground (was a fixed 2.6). |
 | `cornerClearance` | 0.4 | Each corner of the tilted carpet stays at least this far above the ground beneath it, so it does not dip into slopes. |
+| `wallSmoothRadius` | 14 | Mountains taller than the ceiling are walls. The wall is drawn where the ground averaged over a ring of this radius (metres) passes the ceiling, which rounds off gullies and spurs; larger is smoother. The carpet slides along it. |
+| `wallOvershoot` | 4 | The smoothed wall may let the carpet over real ground at most this far above the ceiling (it then flies that much higher there). 0 follows every facet again. |
 | `altitude.mode` | hold | How the carpet's height is set. `hold`: it flies level and keeps `hoverHeight` above the ground (or a palace roof) by itself, rising over hills up to `world.ceiling`; up/down (mouse, arrow keys, tilt, drag) raise and lower the carpet's nose to aim, and the camera stays nearly level (`camera.pitchFollow`). `free`: the carpet flies where it points, so up/down climb and dive, up to `world.ceiling`. |
 | `altitude.hoverHeight` | 4 | `hold` only: metres above the ground (or palace roof) the carpet keeps. |
 | `altitude.lookAheadSeconds` | 0.8 | `hold` only: how far ahead along its path (in seconds of flight) the carpet looks for rising ground, so it starts to climb before a slope. |

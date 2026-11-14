@@ -261,7 +261,6 @@ function groundFloor(P) {
 // Palace and creature collision. The carpet is treated as a sphere of radius PR. Coming from above, it rides on roofs and
 // domes; from the side, it is pushed out of walls and towers and slides along them.
 const PR = 2.6;
-const cPrev = new THREE.Vector3();
 function collidePalace(P, prevY) {
   const cx = castle.position.x, cy = castle.position.y, cz = castle.position.z, clear = CFG.player.groundClearance;
   for (let pass = 0; pass < 2; pass++) { // two passes settle corners where shapes meet
@@ -308,6 +307,45 @@ function holdTarget(P) {
     for (let i = 1; i <= 6; i++) top = Math.max(top, surfaceTop(P.x + ux * L * i / 6, P.z + uz * L * i / 6));
   }
   return Math.min(CFG.world.ceiling, top + A.hoverHeight);
+}
+
+// Ground the carpet may not fly over, as a smooth field: the mean ground height (plus clearance) at the point and
+// in a ring of wallSmoothRadius around it. Where it exceeds the ceiling there is a wall. Averaging rounds off the
+// facets, gullies and spurs of the mountains, so the wall is a gentle contour instead of following every triangle.
+function wallH(x, z) {
+  const r = CFG.player.wallSmoothRadius; let s = groundH(x, z);
+  const here = groundFloor(wTmp.set(x, 0, z)); // the lowest the carpet itself can be here, corners included
+  for (let i = 0; i < 8; i++) s += groundH(x + WALL_RING[i][0] * r, z + WALL_RING[i][1] * r);
+  // ... but never more than wallOvershoot below the real ground here, so a sharp spur cannot carry the carpet
+  // far above the ceiling
+  return Math.max(s / 9 + CFG.player.groundClearance, here - CFG.player.wallOvershoot);
+}
+const wTmp = new THREE.Vector3();
+const WALL_RING = Array.from({ length: 8 }, (_, i) => [Math.cos(i * Math.PI / 4), Math.sin(i * Math.PI / 4)]);
+// Mountains taller than the ceiling are walls. A move into one is deflected: the same step is tried turned by
+// 15, 30 … 105 degrees to either side (first towards the side the wall's contour runs on, which is remembered so
+// the carpet does not flip-flop), and the smallest turn that is free is taken, a little shorter the sharper the
+// turn. So the carpet slides around a mountain whatever its facets look like; only a pocket closed on both sides
+// stops it. (If it somehow is already above such ground, it may still move anywhere that is not higher.)
+let wallSide = 1, wallSideT = -9;
+function slideAlongWall(P, prevX, prevZ) {
+  const limit = Math.max(CFG.world.ceiling, wallH(prevX, prevZ));
+  if (wallH(P.x, P.z) <= limit) return;
+  const dx = P.x - prevX, dz = P.z - prevZ;
+  if (G.playTime - wallSideT > 0.5) { // a fresh contact: pick the side from the slope here
+    const e = 4, gx = wallH(P.x + e, P.z) - wallH(P.x - e, P.z), gz = wallH(P.x, P.z + e) - wallH(P.x, P.z - e);
+    let tx = -gz, tz = gx; if (dx * tx + dz * tz < 0) { tx = -tx; tz = -tz; } // along the contour, the way we are heading
+    wallSide = dx * tz - dz * tx >= 0 ? 1 : -1;
+  }
+  wallSideT = G.playTime;
+  for (let n = 1; n <= 7; n++) {
+    const a = n * Math.PI / 12, c = Math.cos(a), sn = Math.sin(a), f = Math.max(0.3, c);
+    for (const side of [wallSide, -wallSide]) {
+      const x = prevX + (dx * c - dz * sn * side) * f, z = prevZ + (dx * sn * side + dz * c) * f;
+      if (wallH(x, z) <= limit) { P.x = x; P.z = z; wallSide = side; return; }
+    }
+  }
+  P.x = prevX; P.z = prevZ; // a pocket: stay
 }
 
 let throttleHeld = false;
@@ -362,12 +400,7 @@ export function updatePlayer(dt) {
   // Mountains taller than the ceiling are walls: where the ground would rise above the ceiling, the move is
   // undone along that axis, so the carpet slides along the slope instead of climbing it. (If it somehow is
   // already above such ground, it may still move anywhere that is not higher.)
-  const wall = Math.max(CFG.world.ceiling, groundFloor(cPrev.set(prevX, prevY, prevZ)));
-  if (groundFloor(P) > wall) {
-    const nx = P.x, nz = P.z;
-    P.x = prevX;
-    if (groundFloor(P) > wall) { P.x = nx; P.z = prevZ; if (groundFloor(P) > wall) P.x = prevX; }
-  }
+  slideAlongWall(P, prevX, prevZ);
   const gy = groundFloor(P);
   let skim = P.y - gy;
   if (skim < 0) { P.y = gy; skim = 0; }
@@ -397,6 +430,7 @@ export function updatePlayer(dt) {
 }
 
 const camLook = new THREE.Vector3(), tA = new THREE.Vector3(), tB = new THREE.Vector3(), tC = new THREE.Vector3();
+const camOff = new THREE.Vector3(), lookOff = new THREE.Vector3(), camVel = new THREE.Vector3(), camPrev = new THREE.Vector3();
 let camSmoothed = false, titleY = 60;
 export function updateCamera(dt, title) {
   if (title) {
@@ -415,9 +449,21 @@ export function updateCamera(dt, title) {
   const want = tA.copy(P).addScaledVector(dir, -K.distance); want.y += K.height;
   const gy = groundH(want.x, want.z) + 3; if (want.y < gy) want.y = gy;
   const look = tB.copy(P).addScaledVector(dir, K.lookAhead); look.y += K.lookHeight;
-  if (!camSmoothed) { camera.position.copy(want); camLook.copy(look); camSmoothed = true; }
+  // Sideways and along the flight, the camera rides with the carpet: what is eased is its offset from the carpet,
+  // not its place in the world, and the way it hangs back at speed (by speed / follow, as before) is put into that
+  // offset from the carpet's smoothed velocity. Easing the world position instead made the gap depend on the
+  // length of each frame, so with uneven frames the carpet wobbled on screen, most when flying backwards (the
+  // carpet is then closest to the camera) with the nose up or down. Height is still eased in the world, which
+  // softens bumps in the ground.
   const k = 1 - Math.exp(-dt * K.follow);
-  camera.position.lerp(want, k); camLook.lerp(look, k);
+  if (!camSmoothed) { camVel.set(0, 0, 0); camPrev.copy(P); }
+  camVel.x = lerp(camVel.x, (P.x - camPrev.x) / dt, k); camVel.z = lerp(camVel.z, (P.z - camPrev.z) / dt, k); camPrev.copy(P);
+  const lagX = camVel.x / K.follow, lagZ = camVel.z / K.follow;
+  if (!camSmoothed) { camOff.set(want.x - P.x - lagX, 0, want.z - P.z - lagZ); lookOff.set(look.x - P.x - lagX, 0, look.z - P.z - lagZ); camera.position.y = want.y; camLook.y = look.y; camSmoothed = true; }
+  camOff.x = lerp(camOff.x, want.x - P.x - lagX, k); camOff.z = lerp(camOff.z, want.z - P.z - lagZ, k);
+  lookOff.x = lerp(lookOff.x, look.x - P.x - lagX, k); lookOff.z = lerp(lookOff.z, look.z - P.z - lagZ, k);
+  camera.position.set(P.x + camOff.x, lerp(camera.position.y, want.y, k), P.z + camOff.z);
+  camLook.set(P.x + lookOff.x, lerp(camLook.y, look.y, k), P.z + lookOff.z);
   camera.lookAt(camLook);
   const base = CFG.player.baseSpeed;
   const fov = K.fov + clamp(G.speed / base, 0, 1) * K.fovSpeedExtra; // a little wider at speed

@@ -4,6 +4,22 @@ All notable changes to Windloom are recorded here. The format follows [Keep a Ch
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-14
+
+### Added
+- Phones and tablets are played sideways: held upright, a cover asks you to turn the device (and a running flight pauses). Android also locks the screen sideways in full screen and when installed.
+- Tutorial: two spring tasks after the flying lessons, before mana gathering and the wyverns. 1/2 halves your vitality and sends you to the ember spring until the red bar is full; 2/2 halves your spell mana and sends you to the azure spring until the blue bar is full.
+
+### Changed
+- The palace looks richer at every stage, with the same layout and collision shapes: domes, shafts and drums are smooth and rounder (the octagonal plinth and bases, merlons and star keep their facets), the arches have tiled frames, warm lit windows run up the minarets and round the drum, corner towers and (from the Golden Dome on) an upper storey, the great dome wears a band, the plinth has a second step and the walled courtyard a long pool.
+
+### Fixed
+- The picture no longer oscillates when frames are uneven, which showed most when flying backwards with the nose up or down. The chase camera now eases its offset from the carpet instead of its place in the world (it hangs back at speed as before), so the gap no longer depends on the length of each frame.
+- Mountains taller than the ceiling no longer trap the carpet on their facets. The wall is a smoothed contour (`player.wallSmoothRadius`, `player.wallOvershoot`), and a move into it is deflected along it to whichever side is free, instead of being undone axis by axis, which stopped the carpet dead.
+- Tutorial on phones held sideways: the task panel no longer overlaps the bars or the map. It is now placed between them by their actual edges, including the iPhone's notch inset.
+- iPhone: a quick double tap or a pinch no longer zooms the page.
+- Phones and tablets no longer show the frame-rate readout below the map, where it ran into the Centre button.
+
 ## [0.5.1] - 2026-11-14
 
 ### Added

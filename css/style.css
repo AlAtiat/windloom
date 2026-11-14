@@ -16,6 +16,7 @@
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
+html{touch-action:manipulation;-webkit-text-size-adjust:100%} /* no double-tap zoom */
 [hidden]{display:none!important}
 body{
   background:var(--ink);
@@ -131,7 +132,11 @@ body{
 /* Landscape phones: the task panel goes back to the top centre, between the bars and the map (each 16 px from
    its edge and 118 or 112 px wide), in small type, so it does not cover the middle of the screen */
 @media (pointer:coarse) and (orientation:landscape){
-  #task{top:calc(10px + env(safe-area-inset-top,0px));width:min(560px,calc(100vw - 300px));padding:6px 10px;gap:4px}
+  /* placed between the two panels by their actual edges, safe-area insets included (the iPhone's notch side is
+     about 47 px), and centred within that gap up to 560 px wide */
+  #task{top:calc(10px + env(safe-area-inset-top,0px));transform:none;margin-inline:auto;padding:6px 10px;gap:4px;
+    left:calc(max(16px,env(safe-area-inset-left,0px)) + 118px + 10px);right:calc(max(16px,env(safe-area-inset-right,0px)) + var(--radar) + 10px);
+    width:auto;max-width:560px}
   #taskName{font-size:14px}
   #taskCount{font-size:13px}
   .chips{gap:3px}
@@ -140,8 +145,15 @@ body{
   #taskCont{font-size:11px}
   #hud.tut #toast{font-size:14px}
 }
+#rotate{display:none}
+@media (pointer:coarse) and (orientation:portrait){
+  #rotate{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    padding:24px;background:var(--ink);color:var(--paper);text-align:center;font:700 20px/1.3 var(--font-display);touch-action:none}
+  #rotate svg{color:var(--gold)}
+}
 @media (pointer:coarse){
   .touch{display:flex}
+  #fps{display:none} /* no frame-rate readout on phones and tablets: it ran into the Centre button */
   #steer{display:none} /* the aiming cross stays: it shows where the nose points */
 }
 #overlay{position:fixed;inset:0;display:flex;overflow-x:hidden;overflow-y:auto;touch-action:pan-y;

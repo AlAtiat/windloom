@@ -95,6 +95,8 @@
     "carryPerStage": 20,
     "groundClearance": 1.4,
     "cornerClearance": 0.4,
+    "wallSmoothRadius": 14,
+    "wallOvershoot": 4,
     "altitude": { "mode": "hold", "hoverHeight": 4, "lookAheadSeconds": 0.8, "response": 3, "climbRate": 30, "sinkRate": 14 },
     "response": { "steer": 12, "pitch": 6, "strafe": 7, "roll": 6 }
   },

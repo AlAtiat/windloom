@@ -2,7 +2,9 @@
 // 0. The HUD: the bars (top left), then the map (top right), each highlighted until a click, tap or Enter; the
 //    carpet holds still meanwhile.
 // 1. Five flying lessons, in order, shown as chips 1/5 … 5/5 that turn green: aim up and down, turn left and
-//    right, slide sideways (strafe), speed up, brake. 2. Gather manaGoal mana (several times that appears around the
+//    right, slide sideways (strafe), speed up, brake. 1b. The springs, 1/2 and 2/2: vitality is halved and the
+//    player flies to the ember spring until it is full again; then spell mana is halved and they fly to the azure
+//    spring until it is full. 2. Gather manaGoal mana (several times that appears around the
 //    palace once the lessons are done). 3. Bank it in the beam (banking is off until this task). 4. Slay the wyverns
 //    that now appear (fireballs). 5. Find a group of skeleton archers and blast them with a nova. 6. Bank the
 //    creatures' mana. Then done.
@@ -80,6 +82,8 @@ function both(t, a, aNow, b, bNow) { if (aNow) t[a] = true; if (bNow) t[b] = tru
 
 // Task texts after the lessons: name, text and (optional) progress counter, by step
 const TASKS = {
+  springHp: () => ['Find the ember spring', 'Your vitality is down to half. Fly to the ember spring (the red flame on the map) and hover in its crimson flames until the red bar is full.', '1 / 2'],
+  springMana: () => ['Find the azure spring', 'Now half your spell mana is spent. Fly to the azure spring (the blue flame on the map) and hover in its flames until the blue bar is full.', '2 / 2'],
   gather: () => ['Gather mana', 'Fly through the golden orbs around your palace to gather their mana. Close by, they are drawn to you.', count(G.carried, CFG.tutorial.manaGoal)],
   bank: () => ['Bank it in the beam', 'Fly home into the golden beam above your palace (the turquoise diamond on the map). The mana you carry is banked there.', count(G.castleMana, CFG.tutorial.manaGoal)],
   fight: () => ['Slay the wyverns', 'Wyverns are coming (red dots on the map). Aim at them and ' + fireHow() +
@@ -174,6 +178,8 @@ function enter(T) {
   const page = T.step === 'hud' ? HUD_PAGES[T.page] : null;
   spot(page && page.el); T.demo = page && page.demo || null;
   $('vitals').classList.toggle('demo', T.demo === 'bars');
+  if (T.step === 'springHp') { G.hp = G.maxHp / 2; G.lastHurt = G.playTime; } // so it is the spring that mends it
+  if (T.step === 'springMana') { G.spellMana = CFG.spells.mana.max / 2; G.spellExhausted = false; }
   if (T.step === 'gather') scatterOrbs();
   if (T.step === 'fight') for (let i = 0; i < C.wyverns; i++) spawnFlyerNear('wyvern', W.CX, W.CZ, C.wyvernRadiusMin, C.wyvernRadiusMax);
   if (T.step === 'skeletons') {
@@ -209,8 +215,12 @@ export function updateTutorial(dt) {
     if (LESSONS[T.lesson].test(T)) {
       T.lesson++; chips(T);
       if (T.lesson < LESSONS.length) complete(T, null);
-      else { complete(T, 'gather'); toast('You can fly! Next: gather mana.', 2600); }
+      else { complete(T, 'springHp'); toast('You can fly! Next: the springs.', 2600); }
     }
+  } else if (T.step === 'springHp') {
+    if (G.atSpring === 'health' && G.hp >= G.maxHp - 0.01) { complete(T, 'springMana'); toast('The ember spring mends you whenever you are hurt.', 2800); }
+  } else if (T.step === 'springMana') {
+    if (G.atSpring === 'mana' && G.spellMana >= CFG.spells.mana.max - 0.01) { complete(T, 'gather'); toast('The azure spring refills your spells. Next: gather mana.', 2800); }
   } else if (T.step === 'gather') {
     elCount.textContent = count(G.carried, C.manaGoal);
     if (G.carried >= C.manaGoal) {

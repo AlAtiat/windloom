@@ -24,18 +24,37 @@ export const runningInstalled = () => matchMedia('(display-mode: fullscreen), (d
 // Enters full screen if possible; must be called from a tap or click
 export function enterFullscreen() {
   if (isFullscreen() || runningInstalled() || !fsApi()) return;
-  try { const p = fsApi().call(document.documentElement); if (p && p.catch) p.catch(() => { }); } catch (e) { /* not allowed now */ }
+  try { const p = fsApi().call(document.documentElement); if (p && p.then) p.then(lockLandscape, () => { }); } catch (e) { /* not allowed now */ }
+}
+// Android (in full screen or installed): keep the screen sideways. iPhones cannot lock; they get the #rotate cover.
+export function lockLandscape() { try { const p = screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape'); if (p && p.catch) p.catch(() => { }); } catch (e) { /* not supported */ } }
+// iPhone Safari ignores user-scalable=no: a quick second tap still zooms, and two fingers pinch the page.
+// A second tap within 300 ms is swallowed (form fields excepted) and pinch gestures are cancelled.
+function blockPageZoom() {
+  let last = 0;
+  document.addEventListener('touchend', e => {
+    const now = e.timeStamp, t = e.target;
+    if (now - last < 300 && !(t.closest && t.closest('input,select,textarea'))) e.preventDefault();
+    last = now;
+  }, { passive: false });
+  for (const g of ['gesturestart', 'gesturechange']) document.addEventListener(g, e => e.preventDefault(), { passive: false });
+  document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
 }
 export function toggleFullscreen() {
   const d = document, el = d.documentElement;
   try {
     if (isFullscreen()) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
-    else { const p = (el.requestFullscreen || el.webkitRequestFullscreen).call(el); if (p && p.catch) p.catch(() => { }); }
+    else { const p = (el.requestFullscreen || el.webkitRequestFullscreen).call(el); if (p && p.then) p.then(lockLandscape, () => { }); }
   } catch (e) { /* fullscreen not available (e.g. iPhone) */ }
 }
 
-export function bindControls({ onPause, onMute, onBlur, onLockLost, onCentre }) {
+export function bindControls({ onPause, onMute, onBlur, onLockLost, onCentre, onUpright }) {
   const I = G.input;
+  blockPageZoom();
+  if (runningInstalled()) lockLandscape();
+  // turned upright mid-flight (the #rotate cover is shown): pause, so nothing happens unseen
+  const upright = window.matchMedia && window.matchMedia('(pointer:coarse) and (orientation:portrait)');
+  if (upright && upright.addEventListener) upright.addEventListener('change', e => { if (e.matches && onUpright) onUpright(); });
   window.addEventListener('keydown', e => {
     G.keys[e.code] = true;
     if (e.code === 'Escape' || e.code === 'KeyP') { onPause(); return; }
